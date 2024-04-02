@@ -1,0 +1,4 @@
+/home/student/lab-work/Chatroom/build/CMakeFiles/server.dir
+/home/student/lab-work/Chatroom/build/CMakeFiles/client.dir
+/home/student/lab-work/Chatroom/build/CMakeFiles/edit_cache.dir
+/home/student/lab-work/Chatroom/build/CMakeFiles/rebuild_cache.dir
