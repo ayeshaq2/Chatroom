@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Client</title>
+</head>
+
+<body>
+    <textarea id="input" placeholder="Type your message"></textarea>
+    <button onclick="sendMessage()">Send</button>
+    <div id="output"></div>
+
+    <script>
+        const socket = new WebSocket('ws://localhost:9002'); // Connect to the WebSocket server
+
+        // Function to handle messages received from the server
+        socket.onmessage = function (event) {
+            const output = document.getElementById('output');
+            const morseCode = event.data;
+            output.innerHTML += '<p>' + morseCode + '</p>';
+        };
+
+        // Function to send a message to the server
+        function sendMessage() {
+            const input = document.getElementById('input');
+            const message = input.value;
+
+            socket.send(message);
+            input.value = ''; // Clear the input field after sending the message
+        }
+    </script>
+</body>
+<div>
+    "nour"
+    "liyan2"
+    "rahmahs6"
+</div>
+</html>
