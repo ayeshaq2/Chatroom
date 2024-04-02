@@ -1,55 +1,65 @@
 #include <iostream>
-#include <cpprest/http_listener.h>
-#include <cpprest/json.h>
-
-using namespace web;
-using namespace web::http;
-using namespace web::http::experimental::listener;
-
-void set_cors(http_response& response) {
-    // Add CORS headers to allow requests from any origin
-    response.headers().add("Access-Control-Allow-Origin", "*");
-    response.headers().add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    response.headers().add("Access-Control-Allow-Headers", "Content-Type");
-}
-
-void handle_post(http_request request) {
-    // Extract JSON data from the request
-    request.extract_json().then([=](json::value body) {
-        double num1 = body["num1"].as_double();
-        double num2 = body["num2"].as_double();
-        
-        // Perform addition
-        double result = num1 + num2;
-        
-        // Create JSON response
-        json::value response;
-        response["result"] = result;
-        
-        // Send response with CORS headers
-        http_response httpResponse(status_codes::OK);
-        set_cors(httpResponse); // Set CORS headers for the response
-        httpResponse.set_body(response);
-        request.reply(httpResponse);
-    }).wait();
-}
+#include <string>
+#include <cstring> // For memset
+#include <unistd.h> // For close
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 int main() {
-    http_listener listener("http://localhost:8080");
-    listener.support(methods::POST, handle_post); // Add support for POST requests
-    
-    try {
-        listener.open().then([&listener]() {
-            std::cout << "Server is listening on http://localhost:8080\n";
-        }).wait();
-        
-        std::cout << "Press ENTER to exit." << std::endl;
-        std::string line;
-        std::getline(std::cin, line);
+    // Create a socket
+    int listening = socket(AF_INET, SOCK_STREAM, 0);
+    if (listening == -1) {
+        std::cerr << "Error: Can't create socket!" << std::endl;
+        return -1;
     }
-    catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+
+    // Bind the socket to an IP address and port
+    sockaddr_in hint;
+    hint.sin_family = AF_INET;
+    hint.sin_port = htons(12347);
+    hint.sin_addr.s_addr = INADDR_ANY; // Use any IP address on the local machine
+
+    if (bind(listening, (sockaddr*)&hint, sizeof(hint)) == -1) {
+        std::cerr << "Error: Can't bind to IP/port!" << std::endl;
+        return -1;
     }
-    
+
+    // Tell the socket to listen for incoming connections
+    if (listen(listening, SOMAXCONN) == -1) {
+        std::cerr << "Error: Can't listen!" << std::endl;
+        return -1;
+    }
+
+    // Wait for a connection
+    sockaddr_in client;
+    socklen_t clientSize = sizeof(client);
+    int clientSocket = accept(listening, (sockaddr*)&client, &clientSize);
+    if (clientSocket == -1) {
+        std::cerr << "Error: Can't accept client connection!" << std::endl;
+        return -1;
+    }
+
+    char buf[4096];
+    memset(buf, 0, 4096);
+
+    // Receive message from frontend
+    ssize_t bytesReceived = recv(clientSocket, buf, 4096, 0);
+    if (bytesReceived == -1) {
+        std::cerr << "Error in recv()" << std::endl;
+        close(clientSocket);
+        close(listening);
+        return -1;
+    }
+
+    std::cout << "Received from frontend: " << std::string(buf, 0, bytesReceived) << std::endl;
+
+    // Send response to the frontend
+    std::string response = "Hello from backend!";
+    send(clientSocket, response.c_str(), response.size() + 1, 0);
+
+    // Close the socket
+    close(clientSocket);
+    close(listening);
+
     return 0;
 }
