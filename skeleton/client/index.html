@@ -1,0 +1,60 @@
+<!-- index.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatroom</title>
+</head>
+
+<body>
+    <div id="userInput">
+        <h2>Enter Your Name:</h2>
+        <input type="text" id="userName">
+        <button onclick="joinChatroom()">Join Chatroom</button>
+        <button onclick="createChatroom()">Create Chatroom</button>
+    </div>
+
+    <div id="chatroom" style="display:none;">
+        <!-- Chatroom messages and input will be displayed here -->
+    </div>
+
+    <script>
+        var userName = '';
+
+        function joinChatroom() {
+            userName = document.getElementById('userName').value;
+            // Send request to server to join chatroom
+            // Include userName in request data
+            // Upon successful response, show chatroom interface
+            document.getElementById('userInput').style.display = 'none';
+            document.getElementById('chatroom').style.display = 'block';
+        }
+
+        function createChatroom() {
+            userName = document.getElementById('userName').value;
+            // Send request to server to create new chatroom
+            // Include userName in request data
+            // Upon successful response, show chatroom interface
+            document.getElementById('userInput').style.display = 'none';
+            document.getElementById('chatroom').style.display = 'block';
+        }
+
+        // Function to handle receiving messages from server
+        function receiveMessage(message) {
+            var messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML += '<p>' + message + '</p>';
+        }
+
+        // Function to send message to server
+        function sendMessage() {
+            var messageInput = document.getElementById('messageInput');
+            var message = messageInput.value;
+            // TODO: Send message to server
+        }
+    </script>
+</body>
+
+</html>
