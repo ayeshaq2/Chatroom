@@ -2,10 +2,12 @@ import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout
 from PyQt5.QtCore import Qt
 import socket
+import json
 
-class Frontend(QWidget):
-    def __init__(self):
+class Client(QWidget):
+    def __init__(self, id):
         super().__init__()
+        self.id = id
         self.init_ui()
 
     def init_ui(self):
@@ -16,14 +18,22 @@ class Frontend(QWidget):
         layout.addWidget(self.btn_send)
         self.setLayout(layout)
 
-    def send_message(self):
+    def send_message(self, message):
         try:
+            groupchat_id = 1
+            data={
+                "name":self.id,
+                "message":message,
+                "groupchat_id":groupchat_id
+            }
+            # serialize the dictionary to json format
+            json_data = json.dumps(data)
             # Create a socket object
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             # Connect to the backend
-            client_socket.connect(('localhost', 12347))
+            client_socket.connect(('localhost', 12349))
             # Send message to the backend
-            client_socket.sendall(b'Hello from frontend!')
+            client_socket.sendall(json_data.encode())
             # Receive response from the backend
             response = client_socket.recv(1024)
             print(f'Received from backend: {response.decode()}')
@@ -34,6 +44,8 @@ class Frontend(QWidget):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    frontend = Frontend()
-    frontend.show()
+    client = Client('nada')
+    client.show()
+    message = input('Type a message to send: ')
+    client.send_message(message)
     sys.exit(app.exec_())
