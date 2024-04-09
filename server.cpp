@@ -64,7 +64,7 @@ void sendMessage(){
                 //for each participant, send message
                 for (int client : participants){
                     std::cout << "Sent to client: " << client << std::endl;
-                    send(client, messageJson["message"].asString().c_str(), messageJson["message"].asString().size() + 1, 0);
+                    send(client, messageJson.toStyledString().c_str(), messageJson.toStyledString().size() + 1, 0);
                 }
             } else {
                 std::cerr << "Error parsing message JSON: " << reader.getFormattedErrorMessages() << std::endl;
@@ -78,59 +78,62 @@ void sendMessage(){
 
 //method to receive messages
 void receiveMessage(int clientSocket){
-    // Buffer to store received data
-    char buf[4096];
-    memset(buf, 0, 4096);
+    while(true){
+        // Buffer to store received data
+        char buf[4096];
+        memset(buf, 0, 4096);
 
-    // Receive JSON message from client
-    ssize_t bytesReceived = recv(clientSocket, buf, 4096, 0);
-    if (bytesReceived == -1) {
-        std::cerr << "Error in recv()" << std::endl;
-        close(clientSocket);
-        return;
+        // Receive JSON message from client
+        ssize_t bytesReceived = recv(clientSocket, buf, 4096, 0);
+        if (bytesReceived == -1) {
+            std::cerr << "Error in recv()" << std::endl;
+            close(clientSocket);
+            return;
+        }
+        
+        // Parse received JSON data
+        Json::CharReaderBuilder builder;
+        Json::Value jsonData;
+        std::string parseErrors;
+        std::istringstream jsonStream(std::string(buf, bytesReceived));
+        if (!Json::parseFromStream(builder, jsonStream, &jsonData, &parseErrors)) {
+            std::cerr << "Error parsing JSON: " << parseErrors << std::endl;
+            close(clientSocket);
+            return;
+        }
+
+        // Extract data from JSON
+        std::string clientName = jsonData["name"].asString();
+        std::string message = jsonData["message"].asString();
+        std::string clientId = jsonData["groupchat_id"].asString();
+        //add socket to data
+        jsonData["client_socket"] = clientSocket;
+
+        // Print received data
+        std::cout << "Received JSON from frontend:" << std::endl;
+        std::cout << "Client Name: " << clientName << std::endl;
+        std::cout << "Message: " << message << std::endl;
+        std::cout << "Groupchat ID: " << clientId << std::endl;
+
+        std::string res = "Hello fro,m backend";
+        // send(clientSocket, res.c_str(), res.size() + 1, 0);
+        // std::cout << "SOCKET: " << clientSocket << std::endl;
+        //add data to queue
+        //lock mutex
+        mtx.lock();
+        //add message
+        messageQ.push(jsonData.toStyledString());
+        //unlock
+        mtx.unlock();
+        //sendMessage();
     }
-    
-    // Parse received JSON data
-    Json::CharReaderBuilder builder;
-    Json::Value jsonData;
-    std::string parseErrors;
-    std::istringstream jsonStream(std::string(buf, bytesReceived));
-    if (!Json::parseFromStream(builder, jsonStream, &jsonData, &parseErrors)) {
-        std::cerr << "Error parsing JSON: " << parseErrors << std::endl;
-        close(clientSocket);
-        return;
-    }
-
-    // Extract data from JSON
-    std::string clientName = jsonData["name"].asString();
-    std::string message = jsonData["message"].asString();
-    std::string clientId = jsonData["groupchat_id"].asString();
-    //add socket to data
-    jsonData["client_socket"] = clientSocket;
-
-    // Print received data
-    std::cout << "Received JSON from frontend:" << std::endl;
-    std::cout << "Client Name: " << clientName << std::endl;
-    std::cout << "Message: " << message << std::endl;
-    std::cout << "Groupchat ID: " << clientId << std::endl;
-
-    std::string res = "Hello fro,m backend";
-    // send(clientSocket, res.c_str(), res.size() + 1, 0);
-    // std::cout << "SOCKET: " << clientSocket << std::endl;
-    //add data to queue
-    //lock mutex
-    mtx.lock();
-    //add message
-    messageQ.push(jsonData.toStyledString());
-    //unlock
-    mtx.unlock();
-    //sendMessage();
 }
 
 
 int main() {
     //test-> initialize groupchat
     groupChatList.createGroupChat("GC", {});
+    groupChatList.createGroupChat("GC2", {});
     //initialize sender method thread
     std::thread senderThread(sendMessage);
     // Create a socket
@@ -168,10 +171,25 @@ int main() {
             std::cerr << "Error: Can't accept client connection!" << std::endl;
             return -1;
         }
+        
+        // Send all group chat names to the client
+        std::string allGroupChatNames;
+        for (const auto& pair : groupChatList.groupChats) {
+            allGroupChatNames += pair.first + ",";
+        }
+        //remove last comma
+        allGroupChatNames.erase(allGroupChatNames.size()-1);
+        // Convert string to JSON format
+        Json::Value groupChatNamesJson;
+        groupChatNamesJson["group_chat_names"] = allGroupChatNames;
+        std::string groupChatNamesJsonString = groupChatNamesJson.toStyledString();
+        send(clientSocket, groupChatNamesJsonString.c_str(), groupChatNamesJsonString.size() + 1, 0);
+
         //add client to groupchat
         groupChatList.addParticipant("GC", clientSocket);
-        //when receive message, handle it
-        receiveMessage(clientSocket);
+        //create thread to receive messages from client
+        std::thread clientThread(receiveMessage, clientSocket);
+        clientThread.detach();
         //close(clientSocket);
     }
     close(listening);
