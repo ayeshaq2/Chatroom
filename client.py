@@ -31,7 +31,6 @@ class Client(QWidget):
             # Serialize the dictionary to json format
             json_data = json.dumps(data)
             # Send message to the backend
-            print('Sending...')
             self.client_socket.sendall(json_data.encode())
         except Exception as e:
             print(f'Error: {e}')
