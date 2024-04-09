@@ -5,8 +5,6 @@ import socket
 import json
 import threading
 
-#global variable to define mode
-chatting = False
 
 class Client(QWidget):
     def __init__(self, id):
@@ -14,6 +12,7 @@ class Client(QWidget):
         self.id = id
         self.init_ui()
         self.client_socket = None
+        self.gc = None
 
     def init_ui(self):
         self.setWindowTitle('Frontend')
@@ -25,11 +24,10 @@ class Client(QWidget):
 
     def send_message(self, message):
         try:
-            groupchat_id = "GC"
             data = {
                 "name": self.id,
                 "message": message,
-                "groupchat_id": groupchat_id
+                "groupchat_id": self.gc
             }
             # Serialize the dictionary to json format
             json_data = json.dumps(data)
@@ -64,16 +62,45 @@ class Client(QWidget):
                             gc = input('Input number of groupchat you would like to join: ')
                             print(f'Joining groupchat "{names[int(gc)-1]}"...')
                             #send message to join groupchat
-                            chatting = True
+                            try:
+                                groupchat_name = names[int(gc)-1]
+                                data = {
+                                    "name": self.id,
+                                    "join": groupchat_name
+                                }
+                                # Serialize the dictionary to json format
+                                json_data = json.dumps(data)
+                                # Send message to the backend
+                                self.client_socket.sendall(json_data.encode())
+                                self.gc = groupchat_name
+                            except Exception as e:
+                                print(f'Error: {e}')
                         elif (choice=='2'):
                             new_name = input('Input your groupchat name: ')
                             print(f'Creating and joining new groupchat {new_name}...')
-                            chatting = True
+                            #send message to create groupchat
+                            try:
+                                groupchat_name = names[int(gc)-1]
+                                data = {
+                                    "name": self.id,
+                                    "create": groupchat_name
+                                }
+                                # Serialize the dictionary to json format
+                                json_data = json.dumps(data)
+                                # Send message to the backend
+                                self.client_socket.sendall(json_data.encode())
+                                self.gc = groupchat_name
+                            except Exception as e:
+                                print(f'Error: {e}')
                         else:
                             print('Invalid choice!')
                 # else:
                 #     print("Connection closed by server")
                 #     break
+                message = input('Type a message to send: ')
+                if (message == 'exit'):
+                    sys.exit()
+                self.send_message(message)
         except Exception as e:
             print(f'Error receiving message: {e}')
         # finally:
@@ -96,10 +123,4 @@ if __name__ == '__main__':
     client = Client('nada')
     client.show()
     client.connect_to_server()
-    while(True):
-        if chatting:
-            message = input('Type a message to send: ')
-            if (message == 'exit'):
-                sys.exit()
-            client.send_message(message)
     sys.exit(app.exec_())
