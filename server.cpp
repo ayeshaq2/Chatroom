@@ -4,7 +4,16 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <mutex>
+#include <queue>
+#include <chrono>
+#include <thread>
 #include <json/json.h> // JSON library
+
+std::mutex mtx; //mutex for access to message queue
+std::queue<std::string> messageQ; //queue storing messages
+
+//method to receive messages
 
 int main() {
     // Create a socket
