@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout
+from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLabel, QHBoxLayout, QLineEdit, QScrollArea
 from PyQt5.QtCore import Qt
 import socket
 import json
@@ -15,14 +15,28 @@ class Client(QWidget):
         self.gc = None
 
     def init_ui(self):
-        self.setWindowTitle('Frontend')
+        self.setWindowTitle('Chat Room')
         layout = QVBoxLayout()
-        self.btn_send = QPushButton('Send Message to Backend')
+
+        self.message_display = QTextEdit()
+        self.message_display.setReadOnly(True)
+
+        self.input_field = QLineEdit()
+        self.input_field.setPlaceholderText("Type a message...")
+        self.input_field.returnPressed.connect(self.send_message)
+
+        self.btn_send = QPushButton('Send')
         self.btn_send.clicked.connect(self.send_message)
+
+        layout.addWidget(self.message_display)
+        layout.addWidget(self.input_field)
         layout.addWidget(self.btn_send)
+
         self.setLayout(layout)
 
-    def send_message(self, message):
+    def send_message(self):
+        message = self.input_field.text()
+        self.input_field.clear()
         try:
             data = {
                 "name": self.id,
@@ -55,7 +69,8 @@ class Client(QWidget):
                 if response:
                     response_data = json.loads(response.decode().rstrip(response.decode()[-1]))
                     if "client_socket" in response_data:
-                        print(f'{response_data["name"]}: {response_data["message"]}')
+                        message = (f'{response_data["name"]}: {response_data["message"]}\n')
+                        self.message_display.insertPlainText(message)
                     elif "group_chat_names" in response_data:
                         #intial data send
                         # join gc or create one
