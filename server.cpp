@@ -17,7 +17,7 @@ std::queue<std::string> messageQ; //queue storing messages
 
 //structure for groupchats
 struct GroupChat{
-    std::vector<int> participants;
+    std::map<int, std::string> participants;
 };
 
 //groupchat class
@@ -28,13 +28,13 @@ class GroupChats{
     //methods
     public:
         //new groupchat
-        void createGroupChat(const std::string& groupChatName, const std::vector<int>& initialParticipant){
-            groupChats[groupChatName] = {initialParticipant};
+        void createGroupChat(const std::string& groupChatName){
+            groupChats[groupChatName] = {};
         }
 
         //add participant to groupchat
-        void addParticipant(const std::string& groupChatName, int participant){
-            groupChats[groupChatName].participants.push_back(participant);
+        void addParticipant(const std::string& groupChatName, int participant, const std::string& participantName){
+            groupChats[groupChatName].participants.insert(std::make_pair(participant, participantName));
         }
 };
 //initialize groupchats
@@ -60,11 +60,12 @@ void sendMessage(){
             if (reader.parse(messageDetails, messageJson)) {
                 std::string groupchatId = messageJson["groupchat_id"].asString();
                 //check participants
-                const std::vector<int>& participants = groupChatList.groupChats[groupchatId].participants;
+                const std::map<int, std::string>& participants = groupChatList.groupChats[groupchatId].participants;
                 //for each participant, send message
-                for (int client : participants){
+                for (auto it = participants.begin(); it != participants.end(); ++it) {
+                    int client = it->first; // Access the participant ID
                     std::cout << "Sent to client: " << client << std::endl;
-                    send(client, messageJson["message"].asString().c_str(), messageJson["message"].asString().size() + 1, 0);
+                    send(client, messageJson.toStyledString().c_str(), messageJson.toStyledString().size() + 1, 0);
                 }
             } else {
                 std::cerr << "Error parsing message JSON: " << reader.getFormattedErrorMessages() << std::endl;
@@ -101,40 +102,61 @@ void receiveMessage(int clientSocket){
             close(clientSocket);
             return;
         }
+        //check for "join"
+        if (jsonData.isMember("join")){
+            std::cout << "Joining" << std::endl;
+            // Extract data from JSON
+            std::string groupChatName = jsonData["join"].asString();
+            std::string name = jsonData["name"].asString();
+            groupChatList.addParticipant(groupChatName, clientSocket, name);
+        }
+        //check for 'create'
+        else if (jsonData.isMember("create")){
+            std::cout << "Creating" << std::endl;
+            // Extract data from JSON
+            std::string groupChatName = jsonData["create"].asString();
+            std::string name = jsonData["name"].asString();
+            //first create gc
+            groupChatList.createGroupChat(groupChatName);
+            groupChatList.addParticipant(groupChatName, clientSocket, name);
+        }
+        //send data
+        else{
+            // Extract data from JSON
+            std::string clientName = jsonData["name"].asString();
+            std::string message = jsonData["message"].asString();
+            std::string clientId = jsonData["groupchat_id"].asString();
+            //add socket to data
+            jsonData["client_socket"] = clientSocket;
 
-        // Extract data from JSON
-        std::string clientName = jsonData["name"].asString();
-        std::string message = jsonData["message"].asString();
-        std::string clientId = jsonData["groupchat_id"].asString();
-        //add socket to data
-        jsonData["client_socket"] = clientSocket;
+            // Print received data
+            std::cout << "Received JSON from frontend:" << std::endl;
+            std::cout << "Client Name: " << clientName << std::endl;
+            std::cout << "Message: " << message << std::endl;
+            std::cout << "Groupchat ID: " << clientId << std::endl;
 
-        // Print received data
-        std::cout << "Received JSON from frontend:" << std::endl;
-        std::cout << "Client Name: " << clientName << std::endl;
-        std::cout << "Message: " << message << std::endl;
-        std::cout << "Groupchat ID: " << clientId << std::endl;
-
-        std::string res = "Hello fro,m backend";
-        // send(clientSocket, res.c_str(), res.size() + 1, 0);
-        // std::cout << "SOCKET: " << clientSocket << std::endl;
-        //add data to queue
-        //lock mutex
-        mtx.lock();
-        //add message
-        messageQ.push(jsonData.toStyledString());
-        //unlock
-        mtx.unlock();
-        //sendMessage();
+            std::string res = "Hello fro,m backend";
+            // send(clientSocket, res.c_str(), res.size() + 1, 0);
+            // std::cout << "SOCKET: " << clientSocket << std::endl;
+            //add data to queue
+            //lock mutex
+            mtx.lock();
+            //add message
+            messageQ.push(jsonData.toStyledString());
+            //unlock
+            mtx.unlock();
+            //sendMessage();
+        }
     }
 }
 
 
 int main() {
     //test-> initialize groupchat
-    groupChatList.createGroupChat("GC", {});
-    //initialize sender method thread
+    groupChatList.createGroupChat("Public GroupChat");
+    //initialize sender method thread and detach it
     std::thread senderThread(sendMessage);
+    senderThread.detach();
     // Create a socket
     int listening = socket(AF_INET, SOCK_STREAM, 0);
     if (listening == -1) {
@@ -170,12 +192,23 @@ int main() {
             std::cerr << "Error: Can't accept client connection!" << std::endl;
             return -1;
         }
-        //add client to groupchat
-        groupChatList.addParticipant("GC", clientSocket);
+
+        // Send all group chat names to the client
+        std::string allGroupChatNames;
+        for (const auto& pair : groupChatList.groupChats) {
+            allGroupChatNames += pair.first + ",";
+        }
+        //remove last comma
+        allGroupChatNames.erase(allGroupChatNames.size()-1);
+        // Convert string to JSON format
+        Json::Value groupChatNamesJson;
+        groupChatNamesJson["group_chat_names"] = allGroupChatNames;
+        std::string groupChatNamesJsonString = groupChatNamesJson.toStyledString();
+        send(clientSocket, groupChatNamesJsonString.c_str(), groupChatNamesJsonString.size() + 1, 0);
+
         //create thread to receive messages from client
         std::thread clientThread(receiveMessage, clientSocket);
         clientThread.detach();
-        //close(clientSocket);
     }
     close(listening);
     return 0;
