@@ -38,6 +38,15 @@ class Client(QWidget):
         # finally:
         #     self.client_socket.close()
     
+    # waiting on text to send
+    def input_thread(self):
+        while (True):
+            message = input('Type a message to send: ')
+            if (message == 'exit'):
+                sys.exit()
+                print('exiting')
+            self.send_message(message)
+
     #receive data
     def receive_message(self):
         try:
@@ -45,9 +54,8 @@ class Client(QWidget):
                 response = self.client_socket.recv(1024)
                 if response:
                     response_data = json.loads(response.decode().rstrip(response.decode()[-1]))
-                    print(f'Receieved from backend: {response_data}')
                     if "client_socket" in response_data:
-                        print('message')
+                        print(f'{response_data["name"]}: {response_data["message"]}')
                     elif "group_chat_names" in response_data:
                         #intial data send
                         # join gc or create one
@@ -73,6 +81,10 @@ class Client(QWidget):
                                 # Send message to the backend
                                 self.client_socket.sendall(json_data.encode())
                                 self.gc = groupchat_name
+                                #on initial setup, initiate sender thread
+                                send_thread = threading.Thread(target=self.input_thread)
+                                send_thread.daemon = True
+                                send_thread.start()
                             except Exception as e:
                                 print(f'Error: {e}')
                         elif (choice=='2'):
@@ -80,7 +92,7 @@ class Client(QWidget):
                             print(f'Creating and joining new groupchat {new_name}...')
                             #send message to create groupchat
                             try:
-                                groupchat_name = names[int(gc)-1]
+                                groupchat_name = new_name
                                 data = {
                                     "name": self.id,
                                     "create": groupchat_name
@@ -90,6 +102,10 @@ class Client(QWidget):
                                 # Send message to the backend
                                 self.client_socket.sendall(json_data.encode())
                                 self.gc = groupchat_name
+                                #on initial setup, initiate sender thread
+                                send_thread = threading.Thread(target=self.input_thread)
+                                send_thread.daemon = True
+                                send_thread.start()
                             except Exception as e:
                                 print(f'Error: {e}')
                         else:
@@ -97,10 +113,6 @@ class Client(QWidget):
                 # else:
                 #     print("Connection closed by server")
                 #     break
-                message = input('Type a message to send: ')
-                if (message == 'exit'):
-                    sys.exit()
-                self.send_message(message)
         except Exception as e:
             print(f'Error receiving message: {e}')
         # finally:
@@ -120,7 +132,8 @@ class Client(QWidget):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    client = Client('nada')
+    client_name = input('What name would you like to go by? ')
+    client = Client(client_name)
     client.show()
     client.connect_to_server()
     sys.exit(app.exec_())

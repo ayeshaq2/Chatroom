@@ -153,10 +153,10 @@ void receiveMessage(int clientSocket){
 
 int main() {
     //test-> initialize groupchat
-    groupChatList.createGroupChat("GC");
-    groupChatList.createGroupChat("GC2");
-    //initialize sender method thread
+    groupChatList.createGroupChat("Public GroupChat");
+    //initialize sender method thread and detach it
     std::thread senderThread(sendMessage);
+    senderThread.detach();
     // Create a socket
     int listening = socket(AF_INET, SOCK_STREAM, 0);
     if (listening == -1) {
