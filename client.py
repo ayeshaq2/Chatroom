@@ -10,10 +10,18 @@ class Client(QWidget):
     def __init__(self, id):
         super().__init__()
         self.id = id
+        self.user_colors = {}  # Dictionary to store user colors
+        self.color_index = 0  # To cycle through a predefined list of colors
+        self.colors = ["red", "blue", "green", "purple", "orange", "brown"]  # Color options
         self.init_ui()
         self.client_socket = None
         self.gc = None
 
+    def assign_color(self, user_name):
+        if user_name not in self.user_colors:
+            self.user_colors[user_name] = self.colors[self.color_index]
+            self.color_index = (self.color_index + 1) % len(self.colors)  # Cycle through colors
+  
     def init_ui(self):
         self.setWindowTitle('Chat Room')
         layout = QVBoxLayout()
@@ -69,67 +77,77 @@ class Client(QWidget):
                 if response:
                     response_data = json.loads(response.decode().rstrip(response.decode()[-1]))
                     if "client_socket" in response_data:
-                        message = (f'{response_data["name"]}: {response_data["message"]}\n')
-                        self.message_display.insertPlainText(message)
+                        user_name = response_data["name"]
+                        message = response_data["message"]
+                        self.assign_color(user_name)  # Ensure the user has a color assigned
+                    # Use HTML styling for the user name with the assigned color
+                        colored_name = f'<span style="color: {self.user_colors[user_name]};">{user_name}</span>'
+                        display_message = f'{colored_name}: {message}\n'
+                    # Insert the styled message into the QTextEdit widget
+                        self.message_display.insertHtml(display_message + '<br>')  # Add HTML line break for spacing
                     elif "group_chat_names" in response_data:
-                        #intial data send
-                        # join gc or create one
+                    # Initial data send
                         print('Welcome to the Chat Room! Choose an option from below: ')
                         choice = input('1- Join existing groupchat\n2- Create new groupchat\n')
-                        #join
-                        if (choice=='1'):
+                    # Join or create groupchat logic
+                        if choice == '1':
                             print('Available groupchats: ')
                             names = response_data["group_chat_names"].split(',')
                             for i in range(len(names)):
                                 print(f'{i+1}: {names[i]}')
                             gc = input('Input number of groupchat you would like to join: ')
                             print(f'Joining groupchat "{names[int(gc)-1]}"...')
-                            #send message to join groupchat
                             try:
                                 groupchat_name = names[int(gc)-1]
                                 data = {
                                     "name": self.id,
                                     "join": groupchat_name
-                                }
-                                # Serialize the dictionary to json format
+                            }
+                            # Serialize the dictionary to json format
                                 json_data = json.dumps(data)
-                                # Send message to the backend
+                            # Send message to the backend
                                 self.client_socket.sendall(json_data.encode())
                                 self.gc = groupchat_name
-                                #on initial setup, initiate sender thread
+                            # On initial setup, initiate sender thread
                                 send_thread = threading.Thread(target=self.input_thread)
                                 send_thread.daemon = True
                                 send_thread.start()
                             except Exception as e:
-                                print(f'Error: {e}')
-                        elif (choice=='2'):
-                            new_name = input('Input your groupchat name: ')
-                            print(f'Creating and joining new groupchat {new_name}...')
-                            #send message to create groupchat
-                            try:
-                                groupchat_name = new_name
-                                data = {
-                                    "name": self.id,
-                                    "create": groupchat_name
-                                }
-                                # Serialize the dictionary to json format
-                                json_data = json.dumps(data)
-                                # Send message to the backend
-                                self.client_socket.sendall(json_data.encode())
-                                self.gc = groupchat_name
-                                #on initial setup, initiate sender thread
-                                send_thread = threading.Thread(target=self.input_thread)
-                                send_thread.daemon = True
-                                send_thread.start()
-                            except Exception as e:
-                                print(f'Error: {e}')
-                        else:
-                            print('Invalid choice!')
+                             print(f'Error: {e}')
+                    elif choice == '2':
+                        new_name = input('Input your groupchat name: ')
+                        print(f'Creating and joining new groupchat {new_name}...')
+                        try:
+                            groupchat_name = new_name
+                            data = {
+                                "name": self.id,
+                                "create": groupchat_name
+                            }
+                            # Serialize the dictionary to json format
+                            json_data = json.dumps(data)
+                            # Send message to the backend
+                            self.client_socket.sendall(json_data.encode())
+                            self.gc = groupchat_name
+                            # On initial setup, initiate sender thread
+                            send_thread = threading.Thread(target=self.input_thread)
+                            send_thread.daemon = True
+                            send_thread.start()
+                        except Exception as e:
+                            print(f'Error: {e}')
+                    else:
+                        print('Invalid choice!')
+                # Else block for handling server disconnection if needed
                 # else:
                 #     print("Connection closed by server")
                 #     break
         except Exception as e:
-            print(f'Error receiving message: {e}')
+             print(f'Error receiving message: {e}')
+
+                # Else block for handling server disconnection if needed
+                # else:
+                #     print("Connection closed by server")
+                #     break
+
         # finally:
         #     self.client_socket.close()
     def connect_to_server(self):
