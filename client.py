@@ -1,27 +1,30 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QHBoxLayout, QLineEdit, QLabel, QComboBox, QInputDialog
-from PyQt5.QtCore import Qt
-import socket
 import json
+import socket
 import threading
+import random
+from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLineEdit, QLabel, QComboBox, QInputDialog
+from PyQt5.QtCore import Qt, QDateTime
 
 class Client(QWidget):
     def __init__(self):
         super().__init__()
         self.client_socket = None
-        self.gc = None
-        self.id = None  # Initialize the client's ID as None
+        self.gc = None  # Current chat room
+        self.id = None  # Client's username
+        self.user_colors = {}  # Stores colors assigned to users
+        self.shades_of_pink = ['#FFC0CB', '#FFB6C1', '#FF69B4', '#FF1493', '#DB7093',
+                                '#C71585', '#E6E6FA', '#D8BFD8', '#DDA0DD', '#EE82EE']  # Predefined shades of pink
         self.init_ui()
 
     def init_ui(self):
         self.setWindowTitle('Chat Room')
-        self.setGeometry(100, 100, 500, 900)  # Adjust size and position of the window
+        self.setGeometry(100, 100, 500, 900)
         layout = QVBoxLayout()
 
-        # Ask for user's name
-        self.id, okPressed = QInputDialog.getText(self, "Enter Name","Your name:")
+        self.id, okPressed = QInputDialog.getText(self, "Enter Name", "Your name:")
         if not okPressed or not self.id:
-            sys.exit()  # Exit if no name is entered
+            sys.exit()
 
         self.label = QLabel("Select or create a chat room:")
         layout.addWidget(self.label)
@@ -53,6 +56,26 @@ class Client(QWidget):
         layout.addWidget(self.btn_send)
 
         self.setLayout(layout)
+
+    def generate_user_color(self, username):
+        if username not in self.user_colors:
+            self.user_colors[username] = random.choice(self.shades_of_pink)
+        return self.user_colors[username]
+
+    def display_message(self, message, username):
+        current_datetime = QDateTime.currentDateTime().toString('dd/MM/yyyy HH:mm')
+        color = self.generate_user_color(username)
+        message_html = f"""
+            <div style='margin: 5px;'>
+                <div style='margin-bottom: 2px; color: {color};'><b>{username}</b></div>
+                <div style='padding: 5px 10px; background-color: {color}; color: #ffffff; 
+                    border-radius: 15px; max-width: fit-content; word-wrap: break-word;'>
+                    {message}
+                </div>
+                <div style='margin-top: 2px; font-size: 8pt; color: #888888;'>{current_datetime}</div>
+            </div>
+        """
+        self.message_display.append(message_html)
 
     def on_chat_room_selected(self, index):
         if index > 0:
@@ -105,8 +128,9 @@ class Client(QWidget):
                 if response:
                     response_data = json.loads(response.decode().rstrip(response.decode()[-1]))
                     if "message" in response_data:
-                        message = f'{response_data["name"]}: {response_data["message"]}\n'
-                        self.message_display.append(message)
+                        message = response_data["message"]
+                        username = response_data["name"]
+                        self.display_message(message, username)
                     elif "group_chat_names" in response_data:
                         names = response_data["group_chat_names"].split(',')
                         self.chat_room_selector.addItems(names)
