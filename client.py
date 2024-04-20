@@ -1,15 +1,19 @@
 import sys
+import errno
 import json
 import socket
 import threading
 import random
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLineEdit, QLabel, QComboBox, QInputDialog, QMessageBox
-from PyQt5.QtCore import Qt, QDateTime
+from PyQt5.QtCore import Qt, QDateTime, QTimer
 
 class Client(QWidget):
     def __init__(self):
         super().__init__()
         self.client_socket = None
+        self.connection_timer = QTimer()
+        self.connection_timer.timeout.connect(self.handle_connection_lost)
+        self.connection_lost = False
         self.gc = None  # Current chat room
         self.id = None  # Client's username
         self.user_colors = {}  # Stores colors assigned to users
@@ -104,12 +108,16 @@ class Client(QWidget):
             self.join_chat_room(chat_room_name)
 
     def join_chat_room(self, name):
+        self.clear_messages()
         self.gc = name
         data = {
             "name": self.id,
             "join": name
         }
         self.send_data(data)
+
+    def clear_messages(self):
+        self.message_display.clear()
 
     def create_chat_room(self):
         chat_room_name = self.new_chat_room_name.text()
@@ -123,6 +131,14 @@ class Client(QWidget):
             self.chat_room_selector.addItem(chat_room_name)
             self.chat_room_selector.setCurrentIndex(self.chat_room_selector.count() - 1)
             self.new_chat_room_name.clear()
+
+
+    def update_chat_room_list(self, chat_rooms):
+        print("Chat rooms:", chat_rooms)
+        self.chat_room_selector.clear()
+        self.chat_room_selector.addItem("Select a chat room")
+        for chat_room in chat_rooms:
+            self.chat_room_selector.addItem(chat_room)
 
     def send_message(self):
         message = self.input_field.text()
@@ -144,19 +160,42 @@ class Client(QWidget):
 
     def receive_message(self):
         try:
-            while True:
+            while not self.connection_lost:
                 response = self.client_socket.recv(1024)
                 if response:
-                    response_data = json.loads(response.decode().rstrip(response.decode()[-1]))
-                    if "message" in response_data:
-                        message = response_data["message"]
-                        username = response_data["name"]
-                        self.display_message(message, username)
-                    elif "group_chat_names" in response_data:
-                        names = response_data["group_chat_names"].split(',')
-                        self.chat_room_selector.addItems(names)
+                    response_data_list = response.decode().split('\x00')
+                    #response_data = json.loads(response.decode().rstrip(response.decode()[-1]))
+                    for response_data_str in response_data_list:
+                        if not response_data_str:
+                            continue
+
+                        response_data = json.loads(response_data_str)
+                        if "message" in response_data:
+                            message = response_data["message"]
+                            username = response_data["name"]
+                            self.display_message(message, username)
+                        elif "group_chat_names" in response_data:
+                            names = response_data["group_chat_names"].split(',')
+                            #self.chat_room_selector.addItems(names)
+                            self.update_chat_room_list(names)
+                        elif "new_chat_room" in response_data:
+                            new_room = response_data["new_chat_room"]
+                            if self.chat_room_selector.findText(new_room) == -1:
+                                self.chat_room_selector.addItem(new_room)
+        except ConnectionError as ce:
+            if ce.errno == errno.ECONNRESET or ce.errno == errno.EPIPE:
+                self.connection_lost = True
+                #self.handle_connection_lost()
+                self.connection_timer.start(5000)
         except Exception as e:
-            self.message_display.append(f'Error receiving message: {e}')
+            self.message_display.append(f'Error receiving message: {e} , {response}')
+            self.connection_lost = True
+            self.connection_timer.start(5000)
+
+    def handle_connection_lost(self):
+        QMessageBox.warning(self, "Connection Lost", "Server connection lost. Please restart the application")
+    
+        sys.exit()
 
     def connect_to_server(self):
         try:

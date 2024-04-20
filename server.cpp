@@ -119,6 +119,17 @@ void receiveMessage(int clientSocket){
             //first create gc
             groupChatList.createGroupChat(groupChatName);
             groupChatList.addParticipant(groupChatName, clientSocket, name);
+
+            //adding new chatroom to all clients
+
+            std::string broadcastMessage = "{\"new_chat_room\": \""+ groupChatName + "\"}";
+
+            for (const auto& pair : groupChatList.groupChats){
+                for (const auto& participant : pair.second.participants) {
+                    send(participant.first, broadcastMessage.c_str(), broadcastMessage.size()+1, 0);
+                }
+                
+            }
         }
         //send data
         else{
