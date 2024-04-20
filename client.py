@@ -53,6 +53,13 @@ class Client(QWidget):
         self.create_chat_room_button.clicked.connect(self.create_chat_room)
         layout.addWidget(self.create_chat_room_button)
 
+        self.header_label = QLabel("Chatroom")
+        self.header_label.setAlignment(Qt.AlignCenter)
+        font = self.header_label.font()
+        font.setPointSize(16)
+        self.header_label.setFont(font)
+        layout.addWidget(self.header_label)
+
         self.message_display = QTextEdit()
         self.message_display.setReadOnly(True)
         layout.addWidget(self.message_display)
@@ -112,6 +119,7 @@ class Client(QWidget):
     def on_chat_room_selected(self, index):
         if index > 0:
             chat_room_name = self.chat_room_selector.itemText(index)
+            self.header_label.setText(f"Current Chatroom: {chat_room_name}")
             self.join_chat_room(chat_room_name)
 
     def join_chat_room(self, name):
