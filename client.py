@@ -1,19 +1,26 @@
 import sys
+import time
+import select
 import errno
 import json
 import socket
 import threading
 import random
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLineEdit, QLabel, QComboBox, QInputDialog, QMessageBox
-from PyQt5.QtCore import Qt, QDateTime, QTimer
+from PyQt5.QtCore import Qt, QDateTime, QTimer, QThread, pyqtSignal
+
 
 class Client(QWidget):
+    connection_lost_signal = pyqtSignal()
     def __init__(self):
         super().__init__()
         self.client_socket = None
-        self.connection_timer = QTimer()
-        self.connection_timer.timeout.connect(self.handle_connection_lost)
+        
+        #self.connection_timer = QTimer()
+        #self.connection_timer.timeout.connect(self.handle_connection_lost)
         self.connection_lost = False
+        self.server_shutdown_handled = False
+        
         self.gc = None  # Current chat room
         self.id = None  # Client's username
         self.user_colors = {}  # Stores colors assigned to users
@@ -165,7 +172,7 @@ class Client(QWidget):
                 if response:
                     response_data_list = response.decode().split('\x00')
                     #response_data = json.loads(response.decode().rstrip(response.decode()[-1]))
-                    for response_data_str in response_data_list:
+                    for i, response_data_str in enumerate(response_data_list):
                         if not response_data_str:
                             continue
 
@@ -182,32 +189,46 @@ class Client(QWidget):
                             new_room = response_data["new_chat_room"]
                             if self.chat_room_selector.findText(new_room) == -1:
                                 self.chat_room_selector.addItem(new_room)
+                        # elif "type" in response_data and response_data["type"] == "server_shutdown":
+                        #     if not self.server_shutdown_handled:
+
+                        #         self.handle_connection_lost()
+                        #         self.server_shutdown_handled = True
+                        #         #response_data_list = response_data_list[:i+1]
+                        #         #break
         except ConnectionError as ce:
             if ce.errno == errno.ECONNRESET or ce.errno == errno.EPIPE:
-                self.connection_lost = True
-                #self.handle_connection_lost()
-                self.connection_timer.start(5000)
+                self.connection_lost_signal.emit()
         except Exception as e:
+            QMessageBox.warning(self, "Error", f"Error receieving message: {e}, {response}")
             self.message_display.append(f'Error receiving message: {e} , {response}')
             self.connection_lost = True
-            self.connection_timer.start(5000)
+            #self.connection_timer.start(5000)
 
     def handle_connection_lost(self):
-        QMessageBox.warning(self, "Connection Lost", "Server connection lost. Please restart the application")
-    
-        sys.exit()
+        reply = QMessageBox.warning(self, "Connection Lost", "Server connection lost. Please restart the application")
+        #time.sleep(10)
+        if reply == QMessageBox.Ok:
+            sys.exit()
 
     def connect_to_server(self):
         try:
             self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.client_socket.connect(('localhost', 12349))
             threading.Thread(target=self.receive_message, daemon=True).start()
+        except ConnectionRefusedError as ce:
+            if ce.errno == errno.ECONNRESET or ce.errno == errno.EPIPE:
+                QMessageBox.critical(self, "Connection Error", "Unable to connect to the server. Please make sure the server is running.")
+                sys.exit()  
         except Exception as e:
-            self.message_display.append(f'Error connecting to server: {e}')
+            QMessageBox.critical(self, "Connection Error", f"Error connecting to server: {e}")
+            sys.exit()  
+            
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     client = Client()
     client.show()
     client.connect_to_server()
+    client.connection_lost_signal.connect(client.handle_connection_lost)
     sys.exit(app.exec_())

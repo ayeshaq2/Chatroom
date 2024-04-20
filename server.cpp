@@ -12,6 +12,8 @@
 #include <vector>
 #include <json/json.h> // JSON library
 
+#define SERVER_SHUTDOWN_MESSAGE "{\"type\": \"server_shutdown\"}"
+
 std::mutex mtx; //mutex for access to message queue
 std::queue<std::string> messageQ; //queue storing messages
 
@@ -76,6 +78,30 @@ void sendMessage(){
     }
 
 }
+
+// void sendServerShutdownMessageToClients(){
+//     std::lock_guard <std::mutex> lock(mtx);
+//     while(!messageQ.empty()){
+//         messageQ.pop();
+//     }
+
+//     for (const auto& pair : groupChatList.groupChats){
+//         for(const auto& participant : pair.second.participants){
+//             send(participant.first, SERVER_SHUTDOWN_MESSAGE, strlen(SERVER_SHUTDOWN_MESSAGE), 0);
+//         }
+//     }
+// }
+
+// void signalHandler(int signum) {
+//     std::cout << "Received signal: " << signum << std::endl;
+//     std::cout << "Shutting down the server..." << std::endl;
+//     // Send a server shutdown message to all connected clients
+//     sendServerShutdownMessageToClients();
+//     // Your cleanup code (if any) ...
+//     exit(signum);
+// }
+
+
 
 //method to receive messages
 void receiveMessage(int clientSocket){
@@ -163,6 +189,7 @@ void receiveMessage(int clientSocket){
 
 
 int main() {
+    //signal(SIGINT, signalHandler);
     //test-> initialize groupchat
     groupChatList.createGroupChat("Public GroupChat");
     //initialize sender method thread and detach it
