@@ -3,7 +3,7 @@ import json
 import socket
 import threading
 import random
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLineEdit, QLabel, QComboBox, QInputDialog
+from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLineEdit, QLabel, QComboBox, QInputDialog, QMessageBox
 from PyQt5.QtCore import Qt, QDateTime
 
 class Client(QWidget):
@@ -51,11 +51,32 @@ class Client(QWidget):
         self.input_field.returnPressed.connect(self.send_message)
         layout.addWidget(self.input_field)
 
+        self.leave_chatroom_button = QPushButton("Leave Chatroom")
+        self.leave_chatroom_button.clicked.connect(self.leave_chat_room)
+        layout.addWidget(self.leave_chatroom_button)
+
+
         self.btn_send = QPushButton('Send')
         self.btn_send.clicked.connect(self.send_message)
         layout.addWidget(self.btn_send)
 
         self.setLayout(layout)
+
+    def leave_chat_room(self):
+        if self.gc:
+            data = {
+                "name":self.id,
+                "leave":self.gc
+            }
+
+            self.send_data(data)
+            self.gc = None
+            self.message_display.clear()
+            self.chat_room_selector.setCurrentIndex(0)
+            QMessageBox.information(self, "Chat Room", "You have left the chatroom.")
+        else:
+            QMessageBox.warning(self, "Chat Room", "You are not in any chat room")
+
 
     def generate_user_color(self, username):
         if username not in self.user_colors:
