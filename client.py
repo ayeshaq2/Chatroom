@@ -3,7 +3,7 @@ import json
 import socket
 import threading
 import random
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLineEdit, QLabel, QComboBox, QInputDialog
+from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLineEdit, QLabel, QComboBox, QInputDialog, QMessageBox
 from PyQt5.QtCore import Qt, QDateTime
 
 class Client(QWidget):
@@ -55,8 +55,80 @@ class Client(QWidget):
         self.btn_send.clicked.connect(self.send_message)
         layout.addWidget(self.btn_send)
 
+        self.leave_chatroom_button = QPushButton('Leave Chat Room')
+        self.leave_chatroom_button.clicked.connect(self.leave_chat_room)
+        layout.addWidget(self.leave_chatroom_button)
+
         self.setLayout(layout)
 
+        
+
+
+    def leave_chat_room(self):
+        if self.gc:
+            data={
+                "request":"leave_chatroom",
+                "name":self.id,
+                "leave":self.gc
+            }
+            self.send_data(data)
+            self.gc = None
+            self.message_display.clear()
+            self.chat_room_selector.setCurrentIndex(0)
+            #self.refresh_chat_rooms()
+            #self.request_chat_room_names()
+            QMessageBox.information(self, "Chat Room", "You have left the chat room.")
+        else:
+            QMessageBox.warning(self, "Chat Room", "You are not in any chatroom.")
+
+    def refresh_chat_rooms(self):
+        self.chat_room_selector.clear()
+        self.chat_room_selector.addItem("Select a chat room")
+        self.request_chat_room_names()
+
+    def request_chat_room_names(self):
+        print("entered method")
+        try:
+            #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+            while True:
+                if self.client_socket:
+                    print("Entered if block")
+                    request_data = {
+                        "request": "chatroom_names", 
+                        "groupchat_id" : "",
+                        "message":"",
+                        "name":self.id}
+                    self.client_socket.sendall(json.dumps(request_data).encode())
+
+                    response = self.client_socket.recv(1024).decode()
+                    if response:
+                        print("trying response")
+                        print("rec response:", response)
+                        response_data = json.loads(response)
+                        if "chatroom_names" in response_data:
+                            print("in parsing")
+                            chatroom_names = response_data["chatroom_names"]
+                            self.update_chat_room_selector(chatroom_names)
+                        else:
+                            print("Invalid response:", response_data)
+
+                # if "chatroom_names" in response_data:
+                #     chatroom_names = response_data["chatroom_names"]
+                #     self.chat_room_selector.clear()
+                #     self.chat_room_selector.addItem("Select a chat room")
+                #     self.chat_room_selector.addItems(chatroom_names)
+        except Exception as e:
+            QMessageBox.warning(self,"Error", f"Error communicating with server: {e}")
+
+    def update_chat_room_selector(self, chatroom_names):
+        if isinstance(chatroom_names, list):
+            self.on_chat_room_selector.clear()
+            self.chat_room_selector.addItem("Select a chat room")
+            self.chat_room_selector.addItems(chatroom_names)
+        else:
+            print("Invalid chatroom name:", chatroom_names)
+
+    
     def generate_user_color(self, username):
         if username not in self.user_colors:
             self.user_colors[username] = random.choice(self.shades_of_pink)
@@ -67,6 +139,7 @@ class Client(QWidget):
         color = self.generate_user_color(username)
         message_html = f"""
             <div style='margin: 5px;'>
+                <div style='font-weight: bold;'>{self.gc}</div> 
                 <div style='margin-bottom: 2px; color: {color};'><b>{username}</b></div>
                 <div style='padding: 5px 10px; background-color: {color}; color: #ffffff; 
                     border-radius: 15px; max-width: fit-content; word-wrap: break-word;'>
@@ -83,6 +156,13 @@ class Client(QWidget):
             self.join_chat_room(chat_room_name)
 
     def join_chat_room(self, name):
+        if self.gc:  # Check if client is already in a chatroom
+            # Leave the current chatroom
+            leave_data = {
+                "name": self.id,
+                "leave": self.gc
+            }
+            self.send_data(leave_data)
         self.gc = name
         data = {
             "name": self.id,
@@ -133,15 +213,23 @@ class Client(QWidget):
                         self.display_message(message, username)
                     elif "group_chat_names" in response_data:
                         names = response_data["group_chat_names"].split(',')
+                        self.chat_room_selector.clear()
+                        self.chat_room_selector.addItem("Select a chat room")
                         self.chat_room_selector.addItems(names)
+                    elif "chatroom_names" in json_data:
+                        chatroom_names = json_data["chatroom_names"]
+                        self.update_chat_room_selector(chatroom_names)
+                    else:
+                        print("recieved unexpected JSON: ", json_data)
         except Exception as e:
-            self.message_display.append(f'Error receiving message: {e}')
+            self.message_display.append(f'Error receiving message: {e} , {response}')
 
     def connect_to_server(self):
         try:
             self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.client_socket.connect(('localhost', 12349))
             threading.Thread(target=self.receive_message, daemon=True).start()
+            #self.request_chat_room_names()
         except Exception as e:
             self.message_display.append(f'Error connecting to server: {e}')
 

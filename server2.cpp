@@ -87,36 +87,10 @@ void handle_request(int client_socket){
         return;
     }
 
-    if (jsonData.isMember("request")) {
+    if (jsonData.isMember("request")){
         std::string request_type = jsonData["request"].asString();
-        if (request_type == "chatroom_names") {
-            // Handle request for chat room names
-            std::vector<std::string> chatroom_names = groupChatList.getChatRoomNames();
 
-            // Construct JSON response
-            Json::Value response;
-            response["chatroom_names"] = Json::arrayValue;
-            for (const auto& name : chatroom_names) {
-                response["chatroom_names"].append(name);
-            }
-
-            std::string responseString = response.toStyledString();
-            std::cout << "Response JSON: " << responseString << std::endl;
-            // Send JSON response to client
-            send(client_socket, response.toStyledString().c_str(), response.toStyledString().size() + 1, 0);
-        } else if (request_type=="leave_chatroom"){
-            std::string chatRoomLeave = jsonData["leave"].asString();
-            std::vector<std::string> chatroom_names = groupChatList.getChatRoomNames();
-            Json::Value response;
-            response["chatroom_names"] = Json::arrayValue;
-            for(const auto& name : chatroom_names){
-                response["chatroom_names"].append(name);
-            }
-            std::string responseString = response.toStyledString();
-            for (const auto& pair : groupChatList.groupChats){
-                send(client_socket, responseString.c_str(), responseString.size()+1, 0);
-            }
-        } else if (request_type == "create"){
+        if (request_type == "create"){
             std::string chatRoomName = jsonData["create"].asString();
 
             // Create the chat room
@@ -134,9 +108,11 @@ void handle_request(int client_socket){
                 send(client_socket, responseString.c_str(), responseString.size() + 1, 0);
             }
         }
-
-        }
+        
     }
+
+    }
+    
 
 
 
