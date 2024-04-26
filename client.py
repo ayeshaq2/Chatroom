@@ -12,6 +12,8 @@ from PyQt5.QtCore import Qt, QDateTime, QTimer, QThread, pyqtSignal
 
 class Client(QWidget):
     connection_lost_signal = pyqtSignal()
+
+    #defining some UI features
     def __init__(self):
         super().__init__()
         self.client_socket = None
@@ -28,6 +30,7 @@ class Client(QWidget):
                                 '#C71585', '#E6E6FA', '#D8BFD8', '#DDA0DD', '#EE82EE']  # Predefined shades of pink
         self.init_ui()
 
+    #creating the UI 
     def init_ui(self):
         self.setWindowTitle('Chat Room')
         self.setGeometry(100, 100, 500, 900)
@@ -80,6 +83,7 @@ class Client(QWidget):
 
         self.setLayout(layout)
 
+    #method to define a participant leavinga chatroom 
     def leave_chat_room(self):
         if self.gc:
             data = {
@@ -89,19 +93,21 @@ class Client(QWidget):
 
             self.send_data(data)
             self.gc = None
-            self.message_display.clear()
-            self.chat_room_selector.setCurrentIndex(0)
+            self.message_display.clear()    #clears history for that participant
+            self.chat_room_selector.setCurrentIndex(0) #changes current chatroom
             QMessageBox.information(self, "Chat Room", "You have left the chatroom.")
         else:
             QMessageBox.warning(self, "Chat Room", "You are not in any chat room")
 
-
+    #generating a colour for participant messages
     def generate_user_color(self, username):
         if username not in self.user_colors:
             self.user_colors[username] = random.choice(self.shades_of_pink)
         return self.user_colors[username]
 
+    #method that displays all the messages within the chatroom display
     def display_message(self, message, username):
+        #it displays the messages with the name of the participant, using one of the colours, and adds a timestamp 
         current_datetime = QDateTime.currentDateTime().toString('dd/MM/yyyy HH:mm')
         color = self.generate_user_color(username)
         message_html = f"""
@@ -116,12 +122,14 @@ class Client(QWidget):
         """
         self.message_display.append(message_html)
 
+    #displays the selected chatroom
     def on_chat_room_selected(self, index):
         if index > 0:
             chat_room_name = self.chat_room_selector.itemText(index)
             self.header_label.setText(f"Current Chatroom: {chat_room_name}")
             self.join_chat_room(chat_room_name)
 
+    #method that allows the user to join a chatroom 
     def join_chat_room(self, name):
         self.clear_messages()
         self.gc = name
@@ -131,13 +139,17 @@ class Client(QWidget):
         }
         self.send_data(data)
 
+    #clears the chatroom display
     def clear_messages(self):
         self.message_display.clear()
 
+    #method with functionality to create a chatroom
     def create_chat_room(self):
         chat_room_name = self.new_chat_room_name.text()
         if chat_room_name:
             self.gc = chat_room_name
+
+            #the following data is sent, adding the groupchat 
             data = {
                 "name": self.id,
                 "create": chat_room_name
@@ -148,13 +160,15 @@ class Client(QWidget):
             self.new_chat_room_name.clear()
 
 
+    #updating the dropdown chatrooms list when a new one is created
     def update_chat_room_list(self, chat_rooms):
-        print("Chat rooms:", chat_rooms)
+        #print("Chat rooms:", chat_rooms)
         self.chat_room_selector.clear()
         self.chat_room_selector.addItem("Select a chat room")
         for chat_room in chat_rooms:
             self.chat_room_selector.addItem(chat_room)
 
+    #sending a message into a selected chatroom:
     def send_message(self):
         message = self.input_field.text()
         if message and self.gc:
@@ -166,6 +180,7 @@ class Client(QWidget):
             }
             self.send_data(data)
 
+    #sending the data to our server connection, in json format to be parsed and iterated
     def send_data(self, data):
         try:
             json_data = json.dumps(data)
@@ -173,8 +188,10 @@ class Client(QWidget):
         except Exception as e:
             self.message_display.append(f'Error: {e}')
 
+    #receiving a message from the server
     def receive_message(self):
         try:
+            #parsing the message
             while not self.connection_lost:
                 response = self.client_socket.recv(1024)
                 if response:
@@ -184,15 +201,20 @@ class Client(QWidget):
                         if not response_data_str:
                             continue
 
+                        #group message:
                         response_data = json.loads(response_data_str)
                         if "message" in response_data:
                             message = response_data["message"]
                             username = response_data["name"]
                             self.display_message(message, username)
+                        
+                        #group chat names:
                         elif "group_chat_names" in response_data:
                             names = response_data["group_chat_names"].split(',')
                             #self.chat_room_selector.addItems(names)
                             self.update_chat_room_list(names)
+
+                        #a new chatroom is created:
                         elif "new_chat_room" in response_data:
                             new_room = response_data["new_chat_room"]
                             if self.chat_room_selector.findText(new_room) == -1:
@@ -204,6 +226,8 @@ class Client(QWidget):
                         #         self.server_shutdown_handled = True
                         #         #response_data_list = response_data_list[:i+1]
                         #         #break
+
+        #exception that handles a server error/shutdown:
         except ConnectionError as ce:
             if ce.errno == errno.ECONNRESET or ce.errno == errno.EPIPE:
                 self.connection_lost_signal.emit()
@@ -213,12 +237,14 @@ class Client(QWidget):
             self.connection_lost = True
             #self.connection_timer.start(5000)
 
+    #informs the user that server connection was lost:
     def handle_connection_lost(self):
         reply = QMessageBox.warning(self, "Connection Lost", "Server connection lost. Please restart the application")
         #time.sleep(10)
         if reply == QMessageBox.Ok:
             sys.exit()
 
+    #how the client connects to the server, using socket programming
     def connect_to_server(self):
         try:
             self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

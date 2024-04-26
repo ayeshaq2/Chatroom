@@ -55,8 +55,7 @@ void sendMessage(){
             messageQ.pop();
             //print message
             std::cout << "From queue: " << messageDetails << std::endl;
-            //send message to specific groupchat
-            //parse into json
+            //send message to specific groupchat, parse into json
             Json::Value messageJson;
             Json::Reader reader;
             if (reader.parse(messageDetails, messageJson)) {
@@ -78,28 +77,6 @@ void sendMessage(){
     }
 
 }
-
-// void sendServerShutdownMessageToClients(){
-//     std::lock_guard <std::mutex> lock(mtx);
-//     while(!messageQ.empty()){
-//         messageQ.pop();
-//     }
-
-//     for (const auto& pair : groupChatList.groupChats){
-//         for(const auto& participant : pair.second.participants){
-//             send(participant.first, SERVER_SHUTDOWN_MESSAGE, strlen(SERVER_SHUTDOWN_MESSAGE), 0);
-//         }
-//     }
-// }
-
-// void signalHandler(int signum) {
-//     std::cout << "Received signal: " << signum << std::endl;
-//     std::cout << "Shutting down the server..." << std::endl;
-//     // Send a server shutdown message to all connected clients
-//     sendServerShutdownMessageToClients();
-//     // Your cleanup code (if any) ...
-//     exit(signum);
-// }
 
 
 
