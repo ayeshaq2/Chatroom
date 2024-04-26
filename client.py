@@ -117,6 +117,7 @@ class Client(QWidget):
     def on_chat_room_selected(self, index):
         if index > 0:
             chat_room_name = self.chat_room_selector.itemText(index)
+            self.header_label.setText(f"Current Chatroom: {chat_room_name}")
             self.join_chat_room(chat_room_name)
 
     def join_chat_room(self, name):
