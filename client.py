@@ -5,9 +5,10 @@ import socket
 import threading
 import random
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLineEdit, QLabel, QComboBox, QInputDialog, QMessageBox
-from PyQt5.QtCore import Qt, QDateTime, QTimer
+from PyQt5.QtCore import Qt, QDateTime, QTimer, pyqtSignal
 
 class Client(QWidget):
+    connection_lost_signal = pyqtSignal()
     def __init__(self):
         super().__init__()
         self.client_socket = None
@@ -17,6 +18,7 @@ class Client(QWidget):
         self.gc = None  # Current chat room
         self.id = None  # Client's username
         self.user_colors = {}  # Stores colors assigned to users
+        self.connection_lost_signal.connect(self.handle_connection_lost)
         self.shades_of_pink = ['#FFC0CB', '#FFB6C1', '#FF69B4', '#FF1493', '#DB7093',
                                 '#C71585', '#E6E6FA', '#D8BFD8', '#DDA0DD', '#EE82EE']  # Predefined shades of pink
         self.init_ui()
@@ -184,9 +186,7 @@ class Client(QWidget):
                                 self.chat_room_selector.addItem(new_room)
         except ConnectionError as ce:
             if ce.errno == errno.ECONNRESET or ce.errno == errno.EPIPE:
-                self.connection_lost = True
-                #self.handle_connection_lost()
-                self.connection_timer.start(5000)
+                self.connection_lost_signal.emit()
         except Exception as e:
             self.message_display.append(f'Error receiving message: {e} , {response}')
             self.connection_lost = True
@@ -201,7 +201,12 @@ class Client(QWidget):
         try:
             self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.client_socket.connect(('localhost', 12349))
+            #self.client_socket.connect(('34.234.80.97', 12349))
+
             threading.Thread(target=self.receive_message, daemon=True).start()
+        except ConnectionRefusedError as ce:
+            if ce.errno == errno.ECONNRESET or ce.errno == errno.EPIPE:
+                self.connection_lost_signal.emit()
         except Exception as e:
             self.message_display.append(f'Error connecting to server: {e}')
 
