@@ -12,10 +12,10 @@
 #include <vector>
 #include <json/json.h> // JSON library
 
-#define SERVER_SHUTDOWN_MESSAGE "{\"type\": \"server_shutdown\"}"
-
 std::mutex mtx; //mutex for access to message queue
 std::queue<std::string> messageQ; //queue storing messages
+std::unordered_map<int, std::string> clientGroupMap; //store clientID and groupchats
+
 
 //structure for groupchats
 struct GroupChat{
@@ -55,18 +55,23 @@ void sendMessage(){
             messageQ.pop();
             //print message
             std::cout << "From queue: " << messageDetails << std::endl;
-            //send message to specific groupchat, parse into json
+            //send message to specific groupchat
+            //parse into json
             Json::Value messageJson;
             Json::Reader reader;
             if (reader.parse(messageDetails, messageJson)) {
                 std::string groupchatId = messageJson["groupchat_id"].asString();
                 //check participants
                 const std::map<int, std::string>& participants = groupChatList.groupChats[groupchatId].participants;
+
+
                 //for each participant, send message
                 for (auto it = participants.begin(); it != participants.end(); ++it) {
                     int client = it->first; // Access the participant ID
                     std::cout << "Sent to client: " << client << std::endl;
-                    send(client, messageJson.toStyledString().c_str(), messageJson.toStyledString().size() + 1, 0);
+                    if(clientGroupMap[client]==groupchatId){
+                        send(client, messageJson.toStyledString().c_str(), messageJson.toStyledString().size() + 1, 0);   
+                    }
                 }
             } else {
                 std::cerr << "Error parsing message JSON: " << reader.getFormattedErrorMessages() << std::endl;
@@ -77,8 +82,6 @@ void sendMessage(){
     }
 
 }
-
-
 
 //method to receive messages
 void receiveMessage(int clientSocket){
@@ -112,6 +115,9 @@ void receiveMessage(int clientSocket){
             std::string groupChatName = jsonData["join"].asString();
             std::string name = jsonData["name"].asString();
             groupChatList.addParticipant(groupChatName, clientSocket, name);
+
+            //update client groupchat mapping
+            clientGroupMap[clientSocket] = groupChatName;
         }
         //check for 'create'
         else if (jsonData.isMember("create")){
@@ -133,6 +139,8 @@ void receiveMessage(int clientSocket){
                 }
                 
             }
+
+            clientGroupMap[clientSocket] = groupChatName; 
         }
         //send data
         else{
@@ -166,7 +174,6 @@ void receiveMessage(int clientSocket){
 
 
 int main() {
-    //signal(SIGINT, signalHandler);
     //test-> initialize groupchat
     groupChatList.createGroupChat("Public GroupChat");
     //initialize sender method thread and detach it
