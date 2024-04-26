@@ -144,14 +144,18 @@ class Client(QWidget):
 
     def send_message(self):
         message = self.input_field.text()
-        if message and self.gc:
-            self.input_field.clear()
-            data = {
-                "name": self.id,
-                "message": message,
-                "groupchat_id": self.gc
-            }
-            self.send_data(data)
+        try:
+            if message and self.gc:
+                self.input_field.clear()
+                data = {
+                    "name": self.id,
+                    "message": message,
+                    "groupchat_id": self.gc
+                }
+                self.send_data(data)
+        except ConnectionError as ce:
+            if ce.errno == errno.ECONNRESET or ce.errno == errno.EPIPE:
+                self.connection_lost_signal.emit()
 
     def send_data(self, data):
         try:
@@ -200,8 +204,8 @@ class Client(QWidget):
     def connect_to_server(self):
         try:
             self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.client_socket.connect(('localhost', 12349))
-            #self.client_socket.connect(('34.234.80.97', 12349))
+            #self.client_socket.connect(('localhost', 12349))
+            self.client_socket.connect(('34.234.80.97', 12349))
 
             threading.Thread(target=self.receive_message, daemon=True).start()
         except ConnectionRefusedError as ce:
