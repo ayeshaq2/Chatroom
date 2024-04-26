@@ -12,6 +12,8 @@
 #include <vector>
 #include <json/json.h> // JSON library
 
+#define SERVER_SHUTDOWN_MESSAGE "{\"type\": \"server_shutdown\"}"
+
 std::mutex mtx; //mutex for access to message queue
 std::queue<std::string> messageQ; //queue storing messages
 
@@ -53,8 +55,7 @@ void sendMessage(){
             messageQ.pop();
             //print message
             std::cout << "From queue: " << messageDetails << std::endl;
-            //send message to specific groupchat
-            //parse into json
+            //send message to specific groupchat, parse into json
             Json::Value messageJson;
             Json::Reader reader;
             if (reader.parse(messageDetails, messageJson)) {
@@ -76,6 +77,8 @@ void sendMessage(){
     }
 
 }
+
+
 
 //method to receive messages
 void receiveMessage(int clientSocket){
@@ -119,6 +122,17 @@ void receiveMessage(int clientSocket){
             //first create gc
             groupChatList.createGroupChat(groupChatName);
             groupChatList.addParticipant(groupChatName, clientSocket, name);
+
+            //adding new chatroom to all clients
+
+            std::string broadcastMessage = "{\"new_chat_room\": \""+ groupChatName + "\"}";
+
+            for (const auto& pair : groupChatList.groupChats){
+                for (const auto& participant : pair.second.participants) {
+                    send(participant.first, broadcastMessage.c_str(), broadcastMessage.size()+1, 0);
+                }
+                
+            }
         }
         //send data
         else{
@@ -152,6 +166,7 @@ void receiveMessage(int clientSocket){
 
 
 int main() {
+    //signal(SIGINT, signalHandler);
     //test-> initialize groupchat
     groupChatList.createGroupChat("Public GroupChat");
     //initialize sender method thread and detach it
