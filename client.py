@@ -48,6 +48,13 @@ class Client(QWidget):
         self.create_chat_room_button.clicked.connect(self.create_chat_room)
         layout.addWidget(self.create_chat_room_button)
 
+        self.header_label = QLabel("Chatroom")
+        self.header_label.setAlignment(Qt.AlignCenter)
+        font = self.header_label.font()
+        font.setPointSize(16)
+        self.header_label.setFont(font)
+        layout.addWidget(self.header_label)
+
         self.message_display = QTextEdit()
         self.message_display.setReadOnly(True)
         layout.addWidget(self.message_display)
@@ -57,12 +64,7 @@ class Client(QWidget):
         self.input_field.returnPressed.connect(self.send_message)
         layout.addWidget(self.input_field)
 
-        self.header_label = QLabel("Chatroom")
-        self.header_label.setAlignment(Qt.AlignCenter)
-        font = self.header_label.font()
-        font.setPointSize(16)
-        self.header_label.setFont(font)
-        layout.addWidget(self.header_label)
+        
 
         self.leave_chatroom_button = QPushButton("Leave Chatroom")
         self.leave_chatroom_button.clicked.connect(self.leave_chat_room)
