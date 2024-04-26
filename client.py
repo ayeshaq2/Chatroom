@@ -222,7 +222,9 @@ class Client(QWidget):
     def connect_to_server(self):
         try:
             self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.client_socket.connect(('localhost', 12349))
+            #self.client_socket.connect(('localhost', 12349))
+            self.client_socket.connect(('34.234.80.97', 12349))
+
             threading.Thread(target=self.receive_message, daemon=True).start()
         except ConnectionRefusedError as ce:
             if ce.errno == errno.ECONNRESET or ce.errno == errno.EPIPE:
